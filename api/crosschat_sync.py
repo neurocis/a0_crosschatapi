@@ -34,15 +34,15 @@ class CrossChatSync(WsHandler):
 
     async def on_disconnect(self, sid: str) -> None:
         _PRINTER.print(f"[CrossChat] WS client disconnected: {sid}")
-        # Unregister bridge on disconnect
+        # Mark bridge as disconnected (keep alive for grace period)
         try:
             from usr.plugins.a0_crosschatapi.helpers.bridge_manager import BridgeManager
             mgr = BridgeManager.get_instance()
-            conn = mgr.unregister_by_sid(sid)
+            conn = mgr.mark_disconnected(sid)
             if conn:
                 _PRINTER.print(
-                    f"[CrossChat] Bridge torn down for context={conn.context_id} "
-                    f"agent={conn.agent_name}"
+                    f"[CrossChat] Bridge kept alive for reconnect: "
+                    f"context={conn.context_id} agent={conn.agent_name}"
                 )
         except Exception as e:
             _PRINTER.print(f"[CrossChat] Error on disconnect cleanup: {e}")
@@ -85,6 +85,8 @@ class CrossChatSync(WsHandler):
         """Handle the init handshake from the external agent.
 
         Creates or reuses an AgentContext and registers the bridge.
+        On reconnect with an existing context_id, rebinds the bridge
+        to the new WebSocket sid instead of creating a new one.
         """
         from agent import AgentContext, AgentContextType
         from initialize import initialize_agent
@@ -94,6 +96,8 @@ class CrossChatSync(WsHandler):
 
         agent_name = data.get("agent_name", "External Agent")
         context_id = data.get("context_id")
+        mgr = BridgeManager.get_instance()
+        reconnected = False
 
         # Try to reuse existing context
         context = None
@@ -117,27 +121,37 @@ class CrossChatSync(WsHandler):
                 f"[CrossChat] Reusing context {context_id} for {agent_name}"
             )
 
+            # Try to reconnect an existing (possibly disconnected) bridge
+            existing = mgr.reconnect(context_id, self, sid)
+            if existing:
+                reconnected = True
+                _PRINTER.print(
+                    f"[CrossChat] Reconnected bridge for context {context_id} "
+                    f"with new sid {sid}"
+                )
+
         # Set context metadata to indicate bridge is active
         context.data["_bridge_active"] = True
         context.data["_bridge_agent_name"] = agent_name
 
         # Log the bridge connection in the context
-        display_name = f"\U0001f517 {agent_name}"  # 🔗 emoji
+        display_name = f"\U0001f517 {agent_name}"  # \U0001f517 emoji
+        action = "reconnected" if reconnected else "connected"
         context.log.log(
             type="info",
-            heading=f"Bridge connected: {display_name}",
-            content=f"Bidirectional bridge established with {agent_name}.",
+            heading=f"Bridge {action}: {display_name}",
+            content=f"Bidirectional bridge {action} with {agent_name}.",
         )
 
-        # Register the bridge connection
-        mgr = BridgeManager.get_instance()
-        conn = BridgeConnection(
-            context_id=context_id,
-            agent_name=agent_name,
-            ws_handler=self,
-            ws_sid=sid,
-        )
-        mgr.register(conn)
+        # Register a new bridge connection (only if we didn't reconnect)
+        if not reconnected:
+            conn = BridgeConnection(
+                context_id=context_id,
+                agent_name=agent_name,
+                ws_handler=self,
+                ws_sid=sid,
+            )
+            mgr.register(conn)
 
         # Notify the UI so the new chat appears in sidebar immediately
         try:
