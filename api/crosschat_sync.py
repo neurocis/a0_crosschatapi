@@ -146,19 +146,37 @@ class CrossChatSync(WsHandler):
         except Exception:
             pass
 
-        # Persist the chat state
         try:
             from helpers.persist_chat import save_tmp_chat
             save_tmp_chat(context)
         except Exception:
             pass
 
-        return {
+        # Build the ack payload
+        ack_payload = {
             "type": "init_ack",
             "context_id": context_id,
             "agent_name": agent_name,
             "correlationId": correlation_id,
         }
+
+        # Server-push the init_ack as a separate event so clients that
+        # don't use a Socket.IO ack callback still receive it.
+        try:
+            await self.socketio.emit(
+                "crosschat_init_ack",
+                ack_payload,
+                room=sid,
+                namespace=self._namespace,
+            )
+            _PRINTER.print(
+                f"[CrossChat] Pushed init_ack to {sid} for context {context_id}"
+            )
+        except Exception as e:
+            _PRINTER.print(f"[CrossChat] Failed to push init_ack: {e}")
+
+        # Also return it for clients that DO use the ack callback
+        return ack_payload
 
     async def _handle_sync(
         self, sid: str, data: dict, correlation_id: str
