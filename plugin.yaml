@@ -1,0 +1,10 @@
+name: a0_crosschatapi
+title: Cross-Chat API
+description: >-
+  WebSocket-based bidirectional bridge that allows an external agent to maintain
+  a persistent 2-way streaming connection with Agent Zero. Messages flow through
+  without triggering local inference unless explicitly requested.
+version: 1.0.0
+settings_sections: []
+per_project_config: false
+per_agent_config: false
