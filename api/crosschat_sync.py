@@ -23,11 +23,11 @@ class CrossChatSync(WsHandler):
 
     @classmethod
     def requires_auth(cls) -> bool:
-        return True
+        return False
 
     @classmethod
     def requires_csrf(cls) -> bool:
-        return True
+        return False
 
     async def on_connect(self, sid: str) -> None:
         _PRINTER.print(f"[CrossChat] WS client connected: {sid}")
@@ -104,12 +104,15 @@ class CrossChatSync(WsHandler):
         if context is None:
             cfg = initialize_agent()
             context = AgentContext(cfg, type=AgentContextType.USER)
+            context.name = f"\U0001f517 {agent_name}"
             context_id = context.id
             _PRINTER.print(
                 f"[CrossChat] Created new context {context_id} for {agent_name}"
             )
         else:
             context_id = context.id
+            # Update name in case agent_name changed on reconnect
+            context.name = f"\U0001f517 {agent_name}"
             _PRINTER.print(
                 f"[CrossChat] Reusing context {context_id} for {agent_name}"
             )
