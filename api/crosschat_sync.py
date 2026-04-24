@@ -104,7 +104,7 @@ class CrossChatSync(WsHandler):
         if context is None:
             cfg = initialize_agent()
             context = AgentContext(cfg, type=AgentContextType.USER)
-            context.name = f"\U0001f517 {agent_name}"
+            context.name = f"\U0001f517{agent_name}"
             context_id = context.id
             _PRINTER.print(
                 f"[CrossChat] Created new context {context_id} for {agent_name}"
@@ -112,7 +112,7 @@ class CrossChatSync(WsHandler):
         else:
             context_id = context.id
             # Update name in case agent_name changed on reconnect
-            context.name = f"\U0001f517 {agent_name}"
+            context.name = f"\U0001f517{agent_name}"
             _PRINTER.print(
                 f"[CrossChat] Reusing context {context_id} for {agent_name}"
             )
