@@ -2,6 +2,9 @@
 
 Handles dependency installation and verification for python-socketio.
 The plugin requires Socket.IO for WebSocket support.
+
+Note: This module uses only stdlib imports (no helpers) to avoid import errors
+during plugin discovery when webcolors or other optional dependencies are missing.
 """
 
 import subprocess
@@ -10,11 +13,15 @@ import os
 import json
 from datetime import datetime
 
-from helpers.print_style import PrintStyle
-
 # Plugin directory (where this file lives)
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 STATUS_FILE = os.path.join(PLUGIN_DIR, ".dependency_status.json")
+
+
+def _log(level: str, msg: str) -> None:
+    """Simple logging without framework dependencies."""
+    timestamp = datetime.now().isoformat()
+    print(f"[{timestamp}] [{level}] [a0_crosschatapi] {msg}")
 
 
 def _write_status(status: dict) -> None:
@@ -23,7 +30,7 @@ def _write_status(status: dict) -> None:
         with open(STATUS_FILE, "w") as f:
             json.dump(status, f, indent=2)
     except Exception as e:
-        PrintStyle.warning(f"a0_crosschatapi: could not write status file: {e}")
+        _log("WARN", f"Could not write status file: {e}")
 
 
 def _check_socketio_module() -> bool:
@@ -37,7 +44,7 @@ def _check_socketio_module() -> bool:
 
 def _install_socketio() -> bool:
     """Install python-socketio via pip."""
-    PrintStyle.info("[a0_crosschatapi] Installing python-socketio...")
+    _log("INFO", "Installing python-socketio...")
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "python-socketio>=5.9.0"],
@@ -46,18 +53,16 @@ def _install_socketio() -> bool:
             timeout=60,
         )
         if result.returncode == 0:
-            PrintStyle.success("[a0_crosschatapi] python-socketio installed successfully")
+            _log("INFO", "python-socketio installed successfully")
             return True
         else:
-            PrintStyle.error(
-                f"[a0_crosschatapi] Failed to install python-socketio: {result.stderr}"
-            )
+            _log("ERROR", f"Failed to install python-socketio: {result.stderr}")
             return False
     except subprocess.TimeoutExpired:
-        PrintStyle.error("[a0_crosschatapi] Installation timed out")
+        _log("ERROR", "Installation timed out")
         return False
     except Exception as e:
-        PrintStyle.error(f"[a0_crosschatapi] Installation error: {e}")
+        _log("ERROR", f"Installation error: {e}")
         return False
 
 
@@ -67,11 +72,11 @@ def install(**kwargs) -> bool:
     Ensures python-socketio is installed and available for the plugin.
     Writes status to .dependency_status.json for runtime verification.
     """
-    PrintStyle.info("[a0_crosschatapi] Installing plugin...")
+    _log("INFO", "Installing plugin...")
 
     # Check if socketio is already available
     if _check_socketio_module():
-        PrintStyle.success("[a0_crosschatapi] python-socketio already installed")
+        _log("INFO", "python-socketio already installed")
         _write_status({
             "status": "ready",
             "installed_at": datetime.now().isoformat(),
@@ -88,12 +93,10 @@ def install(**kwargs) -> bool:
                 "installed_at": datetime.now().isoformat(),
                 "socketio": True,
             })
-            PrintStyle.success("[a0_crosschatapi] Plugin installation complete")
+            _log("INFO", "Plugin installation complete")
             return True
         else:
-            PrintStyle.error(
-                "[a0_crosschatapi] Installation reported success but module not importable"
-            )
+            _log("ERROR", "Installation reported success but module not importable")
             _write_status({
                 "status": "error",
                 "error": "Installation succeeded but socketio not importable",
@@ -101,7 +104,7 @@ def install(**kwargs) -> bool:
             })
             return False
     else:
-        PrintStyle.error("[a0_crosschatapi] Failed to install required dependencies")
+        _log("ERROR", "Failed to install required dependencies")
         _write_status({
             "status": "error",
             "error": "Failed to install python-socketio",
@@ -112,7 +115,7 @@ def install(**kwargs) -> bool:
 
 def pre_update(**kwargs) -> bool:
     """Called before plugin update."""
-    PrintStyle.info("[a0_crosschatapi] Preparing for update...")
+    _log("INFO", "Preparing for update...")
     return True
 
 
@@ -122,10 +125,10 @@ def uninstall(**kwargs) -> bool:
     Note: We do NOT uninstall python-socketio as it may be needed by other plugins.
     Just clean up our status file.
     """
-    PrintStyle.info("[a0_crosschatapi] Uninstalling plugin...")
+    _log("INFO", "Uninstalling plugin...")
     try:
         if os.path.exists(STATUS_FILE):
             os.remove(STATUS_FILE)
     except Exception as e:
-        PrintStyle.warning(f"[a0_crosschatapi] Could not remove status file: {e}")
+        _log("WARN", f"Could not remove status file: {e}")
     return True
