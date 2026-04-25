@@ -1,0 +1,112 @@
+id: login-form
+name: Agent Zero Bridge
+cols: 6
+rows: 5
+renderer: async (parent) => {
+  parent.innerHTML = `
+    <div style="padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <img src="https://www.agent-zero.ai/res/a0-fullDark.svg" alt="Agent Zero" style="height: 40px; width: auto;" />
+        <h2 style="margin: 0; color: #333;">Agent Zero Bridge</h2>
+      </div>
+      <form id="loginForm" style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label for="serverName" style="display: block; margin-bottom: 4px; font-weight: 500; color: #555;">Server URL</label>
+          <input type="text" id="serverName" placeholder="Enter server URL" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label for="userName" style="display: block; margin-bottom: 4px; font-weight: 500; color: #555;">User Name</label>
+          <input type="text" id="userName" placeholder="Enter user name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label for="password" style="display: block; margin-bottom: 4px; font-weight: 500; color: #555;">Password</label>
+          <input type="password" id="password" placeholder="Enter password" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
+        </div>
+        <button type="submit" style="padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px;">Connect</button>
+        <div id="status" style="margin-top: 12px; font-size: 13px; min-height: 20px;"></div>
+      </form>
+    </div>
+  `
+
+  const serverInput = parent.querySelector("#serverName")
+  const userInput = parent.querySelector("#userName")
+  const passwordInput = parent.querySelector("#password")
+  const form = parent.querySelector("#loginForm")
+  const statusDiv = parent.querySelector("#status")
+
+  serverInput.value = localStorage.getItem("login_server") || ""
+  userInput.value = localStorage.getItem("login_username") || ""
+
+  serverInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      userInput.focus()
+    }
+  })
+
+  userInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      passwordInput.focus()
+    }
+  })
+
+  passwordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      form.dispatchEvent(new Event("submit"))
+    }
+  })
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault()
+    const server = serverInput.value.trim()
+    const username = userInput.value.trim()
+    const password = passwordInput.value.trim()
+
+    if (!server || !username || !password) {
+      statusDiv.textContent = "All fields required"
+      statusDiv.style.color = "#d32f2f"
+      return
+    }
+
+    statusDiv.textContent = "Connecting..."
+    statusDiv.style.color = "#1976d2"
+
+    try {
+      const response = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ server, username, password }),
+        credentials: "include"
+      })
+
+      const responseText = await response.text()
+      let data = {}
+
+      try {
+        data = JSON.parse(responseText)
+      } catch (e) {
+        if (response.ok) {
+          data = { success: true }
+        } else {
+          data = { message: "Login failed: " + responseText.substring(0, 100) }
+        }
+      }
+
+      if (response.ok) {
+        localStorage.setItem("login_server", server)
+        localStorage.setItem("login_username", username)
+        statusDiv.textContent = "Connected successfully"
+        statusDiv.style.color = "#388e3c"
+        passwordInput.value = ""
+      } else {
+        statusDiv.textContent = data.message || "Login failed"
+        statusDiv.style.color = "#d32f2f"
+      }
+    } catch (error) {
+      statusDiv.textContent = "Error: " + error.message
+      statusDiv.style.color = "#d32f2f"
+    }
+  })
+}
